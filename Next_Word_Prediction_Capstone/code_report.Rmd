@@ -1,0 +1,129 @@
+---
+title: "Practical Machine Learning Coursera Assignment"
+output: 
+  html_document: 
+    keep_md: yes
+---
+
+
+#### **Background**
+
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement - a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: http://groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset).
+
+#### **Data**
+
+The training data for this project are available here:
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv  
+The test data are available here:
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv
+
+The data for this project come from this source: http://groupware.les.inf.puc-rio.br/har. If you use the document you create for this class for any purpose please cite them as they have been very generous in allowing their data to be used for this kind of assignment.
+
+#### **What you should submit**
+
+The goal of your project is to predict the manner in which they did the exercise. This is the "classe" variable in the training set. You may use any of the other variables to predict with. You should create a report describing how you built your model, how you used cross validation, what you think the expected out of sample error is, and why you made the choices you did. You will also use your prediction model to predict 20 different test cases.
+
+#### Required Packages
+```{r warning = F, message = F}
+library(caret)
+library(ggplot2)
+library(randomForest)
+library(rpart)
+library(rpart.plot)
+library(rattle)
+```
+#### Getting and Loading the Data
+```{r message = F}
+# save url path
+urlTrain <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+urlTest <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+# check if file pml-training.csv already exist in home dir, download if not
+if (!file.exists("./pml-training.csv")) {
+      download.file(urlTrain, destfile = "./pml-training.csv")
+}
+# check if file pml-testing.csv already exist in home dir, download if not
+if (!file.exists("./pml-testing.csv")) {
+      download.file(urlTest, destfile = "./pml-testing.csv")
+}
+# load data into R
+trainDF <- read.csv("./pml-training.csv")
+testDF <- read.csv("./pml-testing.csv")
+```
+
+```{r}
+# set seed for reproducibility
+set.seed(885)
+```
+#### Cleaning the data
+```{r}
+# check dimensions of data sets
+dim(trainDF)
+dim(testDF)
+# remove Near Zero Variance variables from `train` data and `test` data
+nzv <- nearZeroVar(trainDF, saveMetrics = T)
+trainDFclean <- trainDF[, !nzv$nzv] 
+testDFclean <- testDF[, !nzv$nzv]
+dim(trainDFclean)
+dim(testDFclean)
+```
+```{r}
+# remove columns that contain NA's
+nas <- (colSums(is.na(trainDFclean)) == 0)
+trainDFclean <- trainDFclean[, nas]
+testDFclean <- testDFclean[, nas]
+dim(trainDFclean)
+dim(testDFclean)
+```
+
+```{r}
+# remove 1 to 5 columns from train data (we don't need user info)
+trainDFclean <- trainDFclean[ , -c(1:5)]
+# remove 1 to 5 columns from test data (we don't need user info)
+testDFclean <- testDFclean[ , -c(1:5)]
+dim(trainDFclean)
+dim(testDFclean)
+```
+
+#### Data Partitioning and Prediction Model Building
+```{r}
+# Split the clean training data to 70% training and 30% testing set
+inTrain <- createDataPartition(trainDFclean$classe, p = 0.70, list = F)
+training <- trainDFclean[inTrain, ]
+testing <- trainDFclean[-inTrain, ]
+```
+
+**- Random Forest Model**
+
+
+```{r cache = T}
+# build Random Forest model
+modelRF <- randomForest(as.factor(classe) ~ ., data = training)
+# make prediction on testing dataset
+predictRF <- predict(modelRF, testing, type = "class")
+# build the confusion matrix to see the accuracy of the model
+confusionMatrix(predictRF, testing$classe)
+```
+
+*out-of-sample error: 100 - 99.78 = 0.22%*
+
+**- Decision Tree**
+
+```{r cache = T}
+# build Decision Tree model
+modelDT <- rpart(as.factor(classe) ~ ., data = training, method = "class")
+# plot the model
+fancyRpartPlot(modelDT,sub = "")
+# make prediction on testing dataset
+predictDT <- predict(modelDT, testing, type = "class")
+# build the confusion matrix to see the accuracy of the model
+confusionMatrix(predictDT, testing$classe) 
+```
+
+*out-of-sample error: 100 - 83.01 = 16.99%*
+
+#### **Conclusion**
+We choose Random Forest Model for our prediction because his Accuracy is 0.9978 and Decision Tree's Accuracy is only 0.8301.
+```{r}
+# predict the `class` of the tesdDFclean data
+predict(modelRF, newdata = testDFclean)
+```
